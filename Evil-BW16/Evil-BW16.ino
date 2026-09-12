@@ -9,7 +9,7 @@
    injection offset 0xae0, wext_set_channel, channel plan 0x25.
 */
 
-#include <Arduino.h>
+#include <Arduino.h>                        
 #include "wifi_conf.h"
 #include "wifi_util.h"
 #include "wifi_structures.h"
@@ -18,7 +18,7 @@
 // Hardcoded config
 //==========================
 uint8_t TARGET_BSSID[6] = {0x7A, 0xA7, 0xB9, 0x84, 0xEB, 0x97};  // Virus C_5G (5GHz) AP
-uint8_t DST_MAC[6]      = {0xE6, 0x0E, 0x29, 0xD9, 0x95, 0x2E};  // iPhone (5GHz private MAC)
+uint8_t DST_MAC[6]      = {0x32, 0x21, 0xC4, 0x52, 0xB1, 0xEA};  // MacBook (Virus C_5G)
 #define FRAMES_PER_CYCLE 10
 #define CYCLE_DELAY_MS   1000
 #define RESCAN_MS        30000
